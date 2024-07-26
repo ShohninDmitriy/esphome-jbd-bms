@@ -90,8 +90,9 @@ void JbdBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t ga
     case ESP_GATTC_REG_FOR_NOTIFY_EVT: {
       this->node_state = espbt::ClientState::ESTABLISHED;
 
-      ESP_LOGI(TAG, "Request device info");
-      this->send_command_(JBD_CMD_READ, JBD_CMD_HWVER);
+      // ESP_LOGI(TAG, "Request device info");
+      // this->send_command_(JBD_CMD_READ, JBD_CMD_HWVER);
+      this->send_command_(JBD_CMD_READ, JBD_CMD_HWINFO);
 
       break;
     }
