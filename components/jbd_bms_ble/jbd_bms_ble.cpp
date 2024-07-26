@@ -101,6 +101,7 @@ void JbdBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t ga
                format_hex_pretty(param->notify.value, param->notify.value_len).c_str());
 
       this->assemble_(param->notify.value, param->notify.value_len);
+
       break;
     }
     default:
