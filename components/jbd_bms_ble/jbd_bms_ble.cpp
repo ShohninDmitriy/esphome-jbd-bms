@@ -90,10 +90,7 @@ void JbdBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t ga
     case ESP_GATTC_REG_FOR_NOTIFY_EVT: {
       this->node_state = espbt::ClientState::ESTABLISHED;
 
-      // ESP_LOGI(TAG, "Request device info");
-      // this->send_command_(JBD_CMD_READ, JBD_CMD_HWVER);
       this->send_command_(JBD_CMD_READ, JBD_CMD_HWINFO);
-
       break;
     }
     case ESP_GATTC_NOTIFY_EVT: {
@@ -156,7 +153,6 @@ void JbdBmsBle::update() {
   }
 
   this->send_command_(JBD_CMD_READ, JBD_CMD_HWINFO);
-  this->send_command_(JBD_CMD_READ, JBD_CMD_CELLINFO);
 }
 
 void JbdBmsBle::on_jbd_bms_data(const uint8_t &function, const std::vector<uint8_t> &data) {
@@ -165,6 +161,7 @@ void JbdBmsBle::on_jbd_bms_data(const uint8_t &function, const std::vector<uint8
   switch (function) {
     case JBD_CMD_HWINFO:
       this->on_hardware_info_data_(data);
+      this->send_command_(JBD_CMD_READ, JBD_CMD_CELLINFO);
       break;
     case JBD_CMD_CELLINFO:
       this->on_cell_info_data_(data);
