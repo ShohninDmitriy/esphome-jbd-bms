@@ -1,6 +1,13 @@
 #include "jbd_bms_ble.h"
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
+#include "esphome/core/version.h"
+
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 12, 0)
+#define ADDR_STR(x) x
+#else
+#define ADDR_STR(x) (x).c_str()
+#endif
 
 namespace esphome {
 namespace jbd_bms_ble {
@@ -110,7 +117,7 @@ void JbdBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t ga
       auto *char_notify = this->parent_->get_characteristic(JBD_BMS_SERVICE_UUID, JBD_BMS_NOTIFY_CHARACTERISTIC_UUID);
       if (char_notify == nullptr) {
         ESP_LOGE(TAG, "[%s] No notify service found at device, not an JBD BMS..?",
-                 this->parent_->address_str().c_str());
+                 ADDR_STR(this->parent_->address_str()));
         break;
       }
       this->char_notify_handle_ = char_notify->handle;
@@ -124,7 +131,7 @@ void JbdBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t ga
       auto *char_command = this->parent_->get_characteristic(JBD_BMS_SERVICE_UUID, JBD_BMS_CONTROL_CHARACTERISTIC_UUID);
       if (char_command == nullptr) {
         ESP_LOGE(TAG, "[%s] No control service found at device, not an JBD BMS..?",
-                 this->parent_->address_str().c_str());
+                 ADDR_STR(this->parent_->address_str()));
         break;
       }
       this->char_command_handle_ = char_command->handle;
@@ -146,7 +153,7 @@ void JbdBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t ga
         break;
 
       ESP_LOGV(TAG, "Notification received (handle 0x%02X): %s", param->notify.handle,
-               format_hex_pretty(param->notify.value, param->notify.value_len).c_str());
+               format_hex_pretty(param->notify.value, param->notify.value_len).c_str());  // NOLINT
 
       this->assemble(param->notify.value, param->notify.value_len);
 
@@ -248,14 +255,14 @@ void JbdBmsBle::send_root_password_() {
 
 void JbdBmsBle::send_auth_frame_(uint8_t *frame, size_t length) {
   ESP_LOGV(TAG, "Send auth frame (handle 0x%02X): %s", this->char_command_handle_,
-           format_hex_pretty(frame, length).c_str());
+           format_hex_pretty(frame, length).c_str());  // NOLINT
 
   auto status =
       esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(), this->char_command_handle_,
                                length, frame, ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
 
   if (status) {
-    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", this->parent_->address_str().c_str(), status);
+    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", ADDR_STR(this->parent_->address_str()), status);
   }
 }
 
@@ -392,7 +399,7 @@ void JbdBmsBle::handle_auth_response_(uint8_t command, const uint8_t *data, uint
 void JbdBmsBle::update() {
   this->track_online_status_();
   if (this->node_state != espbt::ClientState::ESTABLISHED) {
-    ESP_LOGW(TAG, "[%s] Not connected", this->parent_->address_str().c_str());
+    ESP_LOGW(TAG, "[%s] Not connected", ADDR_STR(this->parent_->address_str()));
     return;
   }
 
@@ -401,7 +408,7 @@ void JbdBmsBle::update() {
       this->start_authentication_();
     } else {
       this->check_auth_timeout_();
-      ESP_LOGV(TAG, "[%s] Not authenticated yet", this->parent_->address_str().c_str());
+      ESP_LOGV(TAG, "[%s] Not authenticated yet", ADDR_STR(this->parent_->address_str()));
     }
     return;
   }
@@ -417,7 +424,7 @@ void JbdBmsBle::check_auth_timeout_() {
 
   const uint32_t now = millis();
   if (now - this->auth_timeout_start_ > this->auth_timeout_ms_) {
-    ESP_LOGW(TAG, "[%s] Authentication timeout after %d ms, resetting to retry", this->parent_->address_str().c_str(),
+    ESP_LOGW(TAG, "[%s] Authentication timeout after %d ms, resetting to retry", ADDR_STR(this->parent_->address_str()),
              this->auth_timeout_ms_);
     this->authentication_state_ = AuthState::NOT_AUTHENTICATED;
   }
@@ -446,7 +453,7 @@ void JbdBmsBle::on_jbd_bms_data(const uint8_t &function, const std::vector<uint8
       break;
     default:
       ESP_LOGW(TAG, "Unhandled response (function 0x%02X) received: %s", function,
-               format_hex_pretty(&data.front(), data.size()).c_str());
+               format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
   }
 }
 
@@ -456,7 +463,7 @@ void JbdBmsBle::on_cell_info_data_(const std::vector<uint8_t> &data) {
   };
 
   ESP_LOGI(TAG, "Cell info frame (%d bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   uint8_t data_len = data.size();
   if (data_len < 2 || data_len > 64 || (data_len % 2) != 0) {
@@ -507,7 +514,7 @@ void JbdBmsBle::on_hardware_info_data_(const std::vector<uint8_t> &data) {
   };
 
   ESP_LOGI(TAG, "Hardware info frame (%d bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   ESP_LOGD(TAG, "  Device model: %s", this->device_model_.c_str());
 
@@ -586,7 +593,7 @@ void JbdBmsBle::on_error_counts_data_(const std::vector<uint8_t> &data) {
   };
 
   ESP_LOGI(TAG, "Error counts frame (%d bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   uint8_t data_len = data.size();
   if (data_len != 24) {
@@ -609,7 +616,7 @@ void JbdBmsBle::on_error_counts_data_(const std::vector<uint8_t> &data) {
 
 void JbdBmsBle::on_hardware_version_data_(const std::vector<uint8_t> &data) {
   ESP_LOGI(TAG, "Hardware version frame (%d bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   // Byte Len  Payload                                              Content
   // 0    25   0x4A 0x42 0x44 0x2D 0x53 0x50 0x30 0x34 0x53 0x30
@@ -815,13 +822,13 @@ bool JbdBmsBle::write_register(uint8_t address, uint16_t value) {
   frame[8] = JBD_PKT_END;
 
   ESP_LOGV(TAG, "Send command (handle 0x%02X): %s", this->char_command_handle_,
-           format_hex_pretty(frame, sizeof(frame)).c_str());
+           format_hex_pretty(frame, sizeof(frame)).c_str());  // NOLINT
   auto status =
       esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(), this->char_command_handle_,
                                sizeof(frame), frame, ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
 
   if (status) {
-    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", this->parent_->address_str().c_str(), status);
+    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", ADDR_STR(this->parent_->address_str()), status);
   }
 
   return (status == 0);
@@ -841,13 +848,13 @@ bool JbdBmsBle::send_command(uint8_t action, uint8_t function) {
   frame[6] = JBD_PKT_END;
 
   ESP_LOGV(TAG, "Send command (handle 0x%02X): %s", this->char_command_handle_,
-           format_hex_pretty(frame, sizeof(frame)).c_str());
+           format_hex_pretty(frame, sizeof(frame)).c_str());  // NOLINT
   auto status =
       esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(), this->char_command_handle_,
                                sizeof(frame), frame, ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
 
   if (status) {
-    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", this->parent_->address_str().c_str(), status);
+    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", ADDR_STR(this->parent_->address_str()), status);
   }
 
   return (status == 0);
