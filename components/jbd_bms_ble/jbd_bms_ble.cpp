@@ -9,8 +9,7 @@
 #define ADDR_STR(x) (x).c_str()
 #endif
 
-namespace esphome {
-namespace jbd_bms_ble {
+namespace esphome::jbd_bms_ble {
 
 static const char *const TAG = "jbd_bms_ble";
 
@@ -53,7 +52,7 @@ static const uint8_t JBD_MOS_CHARGE = 0x01;
 static const uint8_t JBD_MOS_DISCHARGE = 0x02;
 
 static const uint8_t ERRORS_SIZE = 16;
-static const char *const ERRORS[ERRORS_SIZE] = {
+static constexpr const char *const ERRORS[ERRORS_SIZE] = {
     "Cell overvoltage",               // 0x00
     "Cell undervoltage",              // 0x01
     "Pack overvoltage",               // 0x02
@@ -73,7 +72,7 @@ static const char *const ERRORS[ERRORS_SIZE] = {
 };
 
 static const uint8_t OPERATION_STATUS_SIZE = 8;
-static const char *const OPERATION_STATUS[OPERATION_STATUS_SIZE] = {
+static constexpr const char *const OPERATION_STATUS[OPERATION_STATUS_SIZE] = {
     "Charging",        // 0x01
     "Discharging",     // 0x02
     "Unknown (0x04)",  // 0x04
@@ -88,6 +87,7 @@ static const uint8_t ROOT_PASSWORD[] = {0x4a, 0x42, 0x44, 0x62, 0x74, 0x70, 0x77
                                         0x21, 0x40, 0x23, 0x32, 0x30, 0x32, 0x33};
 static const size_t ROOT_PASSWORD_LENGTH = sizeof(ROOT_PASSWORD);
 
+#ifdef USE_ESP32
 void JbdBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if,
                                     esp_ble_gattc_cb_param_t *param) {
   switch (event) {
@@ -265,6 +265,7 @@ void JbdBmsBle::send_auth_frame_(uint8_t *frame, size_t length) {
     ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", ADDR_STR(this->parent_->address_str()), status);
   }
 }
+#endif  // USE_ESP32
 
 void JbdBmsBle::assemble(const uint8_t *data, uint16_t length) {
   if (this->frame_buffer_.size() > MAX_RESPONSE_SIZE) {
@@ -321,12 +322,13 @@ void JbdBmsBle::assemble(const uint8_t *data, uint16_t length) {
         ESP_LOGW(TAG, "CRC check failed! 0x%04X != 0x%04X", computed_crc, remote_crc);
       }
     } else {
-      ESP_LOGW(TAG, "Invalid frame length: expected %d, got %d", frame_len, this->frame_buffer_.size());
+      ESP_LOGW(TAG, "Invalid frame length: expected %d, got %zu", frame_len, this->frame_buffer_.size());
     }
     this->frame_buffer_.clear();
   }
 }
 
+#ifdef USE_ESP32
 void JbdBmsBle::handle_auth_response_(uint8_t command, const uint8_t *data, uint8_t data_len) {
   ESP_LOGV(TAG, "Auth response - Command: 0x%02X, Data len: %d", command, data_len);
 
@@ -429,6 +431,10 @@ void JbdBmsBle::check_auth_timeout_() {
     this->authentication_state_ = AuthState::NOT_AUTHENTICATED;
   }
 }
+#else
+void JbdBmsBle::update() {}
+void JbdBmsBle::handle_auth_response_(uint8_t command, const uint8_t *data, uint8_t data_len) {}
+#endif  // USE_ESP32
 
 void JbdBmsBle::on_jbd_bms_data(const uint8_t &function, const std::vector<uint8_t> &data) {
   this->reset_online_status_tracker_();
@@ -462,7 +468,7 @@ void JbdBmsBle::on_cell_info_data_(const std::vector<uint8_t> &data) {
     return (uint16_t(data[i + 0]) << 8) | (uint16_t(data[i + 1]) << 0);
   };
 
-  ESP_LOGI(TAG, "Cell info frame (%d bytes) received", data.size());
+  ESP_LOGI(TAG, "Cell info frame (%zu bytes) received", data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   uint8_t data_len = data.size();
@@ -513,7 +519,7 @@ void JbdBmsBle::on_hardware_info_data_(const std::vector<uint8_t> &data) {
     return (uint32_t(jbd_get_16bit(i + 0)) << 16) | (uint32_t(jbd_get_16bit(i + 2)) << 0);
   };
 
-  ESP_LOGI(TAG, "Hardware info frame (%d bytes) received", data.size());
+  ESP_LOGI(TAG, "Hardware info frame (%zu bytes) received", data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   ESP_LOGD(TAG, "  Device model: %s", this->device_model_.c_str());
@@ -592,7 +598,7 @@ void JbdBmsBle::on_error_counts_data_(const std::vector<uint8_t> &data) {
     return (uint16_t(data[i + 0]) << 8) | (uint16_t(data[i + 1]) << 0);
   };
 
-  ESP_LOGI(TAG, "Error counts frame (%d bytes) received", data.size());
+  ESP_LOGI(TAG, "Error counts frame (%zu bytes) received", data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   uint8_t data_len = data.size();
@@ -615,14 +621,14 @@ void JbdBmsBle::on_error_counts_data_(const std::vector<uint8_t> &data) {
 }
 
 void JbdBmsBle::on_hardware_version_data_(const std::vector<uint8_t> &data) {
-  ESP_LOGI(TAG, "Hardware version frame (%d bytes) received", data.size());
+  ESP_LOGI(TAG, "Hardware version frame (%zu bytes) received", data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   // Byte Len  Payload                                              Content
   // 0    25   0x4A 0x42 0x44 0x2D 0x53 0x50 0x30 0x34 0x53 0x30
   //           0x33 0x34 0x2D 0x4C 0x34 0x53 0x2D 0x32 0x30 0x30
   //           0x41 0x2D 0x42 0x2D 0x55
-  this->device_model_ = std::string(data.begin(), data.end());
+  this->device_model_ = std::string(data.begin(), std::find(data.begin(), data.end(), '\0'));
 
   ESP_LOGI(TAG, "  Model name: %s", this->device_model_.c_str());
   this->publish_state_(this->device_model_text_sensor_, this->device_model_);
@@ -790,6 +796,7 @@ void JbdBmsBle::publish_state_(text_sensor::TextSensor *text_sensor, const std::
   text_sensor->publish_state(state);
 }
 
+#ifdef USE_ESP32
 bool JbdBmsBle::change_mosfet_status(uint8_t address, uint8_t bitmask, bool state) {
   if (this->mosfet_status_ == 255) {
     ESP_LOGE(TAG, "Unable to change the Mosfet status because it's unknown");
@@ -859,10 +866,13 @@ bool JbdBmsBle::send_command(uint8_t action, uint8_t function) {
 
   return (status == 0);
 }
+#else
+bool JbdBmsBle::send_command(uint8_t action, uint8_t function) { return false; }
+#endif  // USE_ESP32
 
 std::string JbdBmsBle::bitmask_to_string_(const char *const messages[], const uint8_t &messages_size,
                                           const uint16_t &mask) {
-  std::string values = "";
+  std::string values;
   if (mask) {
     for (int i = 0; i < messages_size; i++) {
       if (mask & (1 << i)) {
@@ -877,5 +887,4 @@ std::string JbdBmsBle::bitmask_to_string_(const char *const messages[], const ui
   return values;
 }
 
-}  // namespace jbd_bms_ble
-}  // namespace esphome
+}  // namespace esphome::jbd_bms_ble

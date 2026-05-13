@@ -6,7 +6,7 @@ from esphome.const import CONF_ID, CONF_PASSWORD
 CONF_AUTH_TIMEOUT = "auth_timeout"
 
 CODEOWNERS = ["@syssi"]
-
+DEPENDENCIES = ["ble_client"]
 AUTO_LOAD = ["binary_sensor", "button", "select", "sensor", "switch", "text_sensor"]
 MULTI_CONF = True
 
@@ -44,7 +44,8 @@ JBD_BMS_BLE_COMPONENT_SCHEMA = cv.Schema(
     }
 )
 
-CONFIG_SCHEMA = (
+CONFIG_SCHEMA = cv.All(
+    cv.require_esphome_version(2025, 11, 0),
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(JbdBmsBle),
@@ -57,7 +58,7 @@ CONFIG_SCHEMA = (
         }
     )
     .extend(ble_client.BLE_CLIENT_SCHEMA)
-    .extend(cv.polling_component_schema("2s"))
+    .extend(cv.polling_component_schema("2s")),
 )
 
 

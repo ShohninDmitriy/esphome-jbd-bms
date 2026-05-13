@@ -8,8 +8,7 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/uart/uart.h"
 
-namespace esphome {
-namespace jbd_bms {
+namespace esphome::jbd_bms {
 
 class JbdBms : public uart::UARTDevice, public PollingComponent {
  public:
@@ -127,6 +126,9 @@ class JbdBms : public uart::UARTDevice, public PollingComponent {
   void set_battery_undervoltage_error_count_sensor(sensor::Sensor *battery_undervoltage_error_count_sensor) {
     battery_undervoltage_error_count_sensor_ = battery_undervoltage_error_count_sensor;
   }
+  void set_battery_cycle_capacity_sensor(sensor::Sensor *battery_cycle_capacity_sensor) {
+    battery_cycle_capacity_sensor_ = battery_cycle_capacity_sensor;
+  }
   void set_cell_voltage_sensor(uint8_t cell, sensor::Sensor *cell_voltage_sensor) {
     this->cells_[cell].cell_voltage_sensor_ = cell_voltage_sensor;
   }
@@ -146,59 +148,61 @@ class JbdBms : public uart::UARTDevice, public PollingComponent {
     device_model_text_sensor_ = device_model_text_sensor;
   }
   void set_rx_timeout(uint16_t rx_timeout) { rx_timeout_ = rx_timeout; }
-  void send_command(uint8_t action, uint8_t function);
+  void set_flow_control_pin(GPIOPin *flow_control_pin) { this->flow_control_pin_ = flow_control_pin; }
+  virtual void send_command(uint8_t action, uint8_t function);
   bool write_register(uint8_t address, uint16_t value);
   bool change_mosfet_status(uint8_t address, uint8_t bitmask, bool state);
   void on_jbd_bms_data(const uint8_t &function, const std::vector<uint8_t> &data);
 
  protected:
-  binary_sensor::BinarySensor *balancing_binary_sensor_;
-  binary_sensor::BinarySensor *charging_binary_sensor_;
-  binary_sensor::BinarySensor *discharging_binary_sensor_;
-  binary_sensor::BinarySensor *online_status_binary_sensor_;
+  binary_sensor::BinarySensor *balancing_binary_sensor_{nullptr};
+  binary_sensor::BinarySensor *charging_binary_sensor_{nullptr};
+  binary_sensor::BinarySensor *discharging_binary_sensor_{nullptr};
+  binary_sensor::BinarySensor *online_status_binary_sensor_{nullptr};
 
-  select::Select *read_eeprom_register_select_;
+  select::Select *read_eeprom_register_select_{nullptr};
 
-  sensor::Sensor *state_of_charge_sensor_;
-  sensor::Sensor *total_voltage_sensor_;
-  sensor::Sensor *current_sensor_;
-  sensor::Sensor *power_sensor_;
-  sensor::Sensor *charging_power_sensor_;
-  sensor::Sensor *discharging_power_sensor_;
-  sensor::Sensor *nominal_capacity_sensor_;
-  sensor::Sensor *charging_cycles_sensor_;
-  sensor::Sensor *capacity_remaining_sensor_;
-  sensor::Sensor *min_cell_voltage_sensor_;
-  sensor::Sensor *max_cell_voltage_sensor_;
-  sensor::Sensor *min_voltage_cell_sensor_;
-  sensor::Sensor *max_voltage_cell_sensor_;
-  sensor::Sensor *delta_cell_voltage_sensor_;
-  sensor::Sensor *average_cell_voltage_sensor_;
-  sensor::Sensor *operation_status_bitmask_sensor_;
-  sensor::Sensor *errors_bitmask_sensor_;
-  sensor::Sensor *balancer_status_bitmask_sensor_;
-  sensor::Sensor *battery_strings_sensor_;
-  sensor::Sensor *temperature_sensors_sensor_;
-  sensor::Sensor *software_version_sensor_;
-  sensor::Sensor *short_circuit_error_count_sensor_;
-  sensor::Sensor *charge_overcurrent_error_count_sensor_;
-  sensor::Sensor *discharge_overcurrent_error_count_sensor_;
-  sensor::Sensor *cell_overvoltage_error_count_sensor_;
-  sensor::Sensor *cell_undervoltage_error_count_sensor_;
-  sensor::Sensor *charge_overtemperature_error_count_sensor_;
-  sensor::Sensor *charge_undertemperature_error_count_sensor_;
-  sensor::Sensor *discharge_overtemperature_error_count_sensor_;
-  sensor::Sensor *discharge_undertemperature_error_count_sensor_;
-  sensor::Sensor *battery_overvoltage_error_count_sensor_;
-  sensor::Sensor *battery_undervoltage_error_count_sensor_;
+  sensor::Sensor *state_of_charge_sensor_{nullptr};
+  sensor::Sensor *total_voltage_sensor_{nullptr};
+  sensor::Sensor *current_sensor_{nullptr};
+  sensor::Sensor *power_sensor_{nullptr};
+  sensor::Sensor *charging_power_sensor_{nullptr};
+  sensor::Sensor *discharging_power_sensor_{nullptr};
+  sensor::Sensor *nominal_capacity_sensor_{nullptr};
+  sensor::Sensor *charging_cycles_sensor_{nullptr};
+  sensor::Sensor *capacity_remaining_sensor_{nullptr};
+  sensor::Sensor *min_cell_voltage_sensor_{nullptr};
+  sensor::Sensor *max_cell_voltage_sensor_{nullptr};
+  sensor::Sensor *min_voltage_cell_sensor_{nullptr};
+  sensor::Sensor *max_voltage_cell_sensor_{nullptr};
+  sensor::Sensor *delta_cell_voltage_sensor_{nullptr};
+  sensor::Sensor *average_cell_voltage_sensor_{nullptr};
+  sensor::Sensor *operation_status_bitmask_sensor_{nullptr};
+  sensor::Sensor *errors_bitmask_sensor_{nullptr};
+  sensor::Sensor *balancer_status_bitmask_sensor_{nullptr};
+  sensor::Sensor *battery_strings_sensor_{nullptr};
+  sensor::Sensor *temperature_sensors_sensor_{nullptr};
+  sensor::Sensor *software_version_sensor_{nullptr};
+  sensor::Sensor *short_circuit_error_count_sensor_{nullptr};
+  sensor::Sensor *charge_overcurrent_error_count_sensor_{nullptr};
+  sensor::Sensor *discharge_overcurrent_error_count_sensor_{nullptr};
+  sensor::Sensor *cell_overvoltage_error_count_sensor_{nullptr};
+  sensor::Sensor *cell_undervoltage_error_count_sensor_{nullptr};
+  sensor::Sensor *charge_overtemperature_error_count_sensor_{nullptr};
+  sensor::Sensor *charge_undertemperature_error_count_sensor_{nullptr};
+  sensor::Sensor *discharge_overtemperature_error_count_sensor_{nullptr};
+  sensor::Sensor *discharge_undertemperature_error_count_sensor_{nullptr};
+  sensor::Sensor *battery_overvoltage_error_count_sensor_{nullptr};
+  sensor::Sensor *battery_undervoltage_error_count_sensor_{nullptr};
+  sensor::Sensor *battery_cycle_capacity_sensor_{nullptr};
 
-  switch_::Switch *charging_switch_;
-  switch_::Switch *discharging_switch_;
-  switch_::Switch *balancer_switch_;
+  switch_::Switch *charging_switch_{nullptr};
+  switch_::Switch *discharging_switch_{nullptr};
+  switch_::Switch *balancer_switch_{nullptr};
 
-  text_sensor::TextSensor *operation_status_text_sensor_;
-  text_sensor::TextSensor *errors_text_sensor_;
-  text_sensor::TextSensor *device_model_text_sensor_;
+  text_sensor::TextSensor *operation_status_text_sensor_{nullptr};
+  text_sensor::TextSensor *errors_text_sensor_{nullptr};
+  text_sensor::TextSensor *device_model_text_sensor_{nullptr};
 
   struct Cell {
     sensor::Sensor *cell_voltage_sensor_{nullptr};
@@ -216,10 +220,11 @@ class JbdBms : public uart::UARTDevice, public PollingComponent {
   // Protection status bitmask (16 Bits)
   // Version
 
-  std::string device_model_{""};
+  std::string device_model_{};
   std::vector<uint8_t> rx_buffer_;
   uint32_t last_byte_{0};
   uint16_t rx_timeout_{150};
+  GPIOPin *flow_control_pin_{nullptr};
   uint8_t no_response_count_{0};
   uint8_t mosfet_status_{255};
 
@@ -246,5 +251,4 @@ class JbdBms : public uart::UARTDevice, public PollingComponent {
   }
 };
 
-}  // namespace jbd_bms
-}  // namespace esphome
+}  // namespace esphome::jbd_bms

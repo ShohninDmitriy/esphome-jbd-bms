@@ -2,8 +2,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 
-namespace esphome {
-namespace jbd_bms {
+namespace esphome::jbd_bms {
 
 static const char *const TAG = "jbd_bms";
 
@@ -30,7 +29,7 @@ static const uint8_t JBD_MOS_CHARGE = 0x01;
 static const uint8_t JBD_MOS_DISCHARGE = 0x02;
 
 static const uint8_t ERRORS_SIZE = 16;
-static const char *const ERRORS[ERRORS_SIZE] = {
+static constexpr const char *const ERRORS[ERRORS_SIZE] = {
     "Cell overvoltage",               // 0x00
     "Cell undervoltage",              // 0x01
     "Pack overvoltage",               // 0x02
@@ -50,7 +49,7 @@ static const char *const ERRORS[ERRORS_SIZE] = {
 };
 
 static const uint8_t OPERATION_STATUS_SIZE = 8;
-static const char *const OPERATION_STATUS[OPERATION_STATUS_SIZE] = {
+static constexpr const char *const OPERATION_STATUS[OPERATION_STATUS_SIZE] = {
     "Charging",        // 0x01
     "Discharging",     // 0x02
     "Unknown (0x04)",  // 0x04
@@ -61,7 +60,12 @@ static const char *const OPERATION_STATUS[OPERATION_STATUS_SIZE] = {
     "Unknown (0x80)",  // 0x80
 };
 
-void JbdBms::setup() { this->send_command(JBD_CMD_READ, JBD_CMD_HWINFO); }
+void JbdBms::setup() {
+  if (this->flow_control_pin_ != nullptr) {
+    this->flow_control_pin_->setup();
+  }
+  this->send_command(JBD_CMD_READ, JBD_CMD_HWINFO);
+}
 
 void JbdBms::loop() {
   const uint32_t now = millis();
@@ -197,7 +201,7 @@ void JbdBms::on_cell_info_data_(const std::vector<uint8_t> &data) {
     return (uint16_t(data[i + 0]) << 8) | (uint16_t(data[i + 1]) << 0);
   };
 
-  ESP_LOGI(TAG, "Cell info frame (%d bytes) received", data.size());
+  ESP_LOGI(TAG, "Cell info frame (%zu bytes) received", data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   uint8_t data_len = data.size();
@@ -245,7 +249,7 @@ void JbdBms::on_error_counts_data_(const std::vector<uint8_t> &data) {
     return (uint16_t(data[i + 0]) << 8) | (uint16_t(data[i + 1]) << 0);
   };
 
-  ESP_LOGI(TAG, "Error counts frame (%d bytes) received", data.size());
+  ESP_LOGI(TAG, "Error counts frame (%zu bytes) received", data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   uint8_t data_len = data.size();
@@ -275,7 +279,7 @@ void JbdBms::on_hardware_info_data_(const std::vector<uint8_t> &data) {
     return (uint32_t(jbd_get_16bit(i + 0)) << 16) | (uint32_t(jbd_get_16bit(i + 2)) << 0);
   };
 
-  ESP_LOGI(TAG, "Hardware info frame (%d bytes) received", data.size());
+  ESP_LOGI(TAG, "Hardware info frame (%zu bytes) received", data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   ESP_LOGD(TAG, "  Device model: %s", this->device_model_.c_str());
@@ -350,14 +354,14 @@ void JbdBms::on_hardware_info_data_(const std::vector<uint8_t> &data) {
 }
 
 void JbdBms::on_hardware_version_data_(const std::vector<uint8_t> &data) {
-  ESP_LOGI(TAG, "Hardware version frame (%d bytes) received", data.size());
+  ESP_LOGI(TAG, "Hardware version frame (%zu bytes) received", data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   // Byte Len  Payload                                              Content
   // 0    25   0x4A 0x42 0x44 0x2D 0x53 0x50 0x30 0x34 0x53 0x30
   //           0x33 0x34 0x2D 0x4C 0x34 0x53 0x2D 0x32 0x30 0x30
   //           0x41 0x2D 0x42 0x2D 0x55
-  this->device_model_ = std::string(data.begin(), data.end());
+  this->device_model_ = std::string(data.begin(), std::find(data.begin(), data.end(), '\0'));
 
   ESP_LOGI(TAG, "  Model name: %s", this->device_model_.c_str());
   this->publish_state_(this->device_model_text_sensor_, this->device_model_);
@@ -415,6 +419,7 @@ void JbdBms::publish_device_unavailable_() {
 
 void JbdBms::dump_config() {  // NOLINT(google-readability-function-size,readability-function-size)
   ESP_LOGCONFIG(TAG, "JbdBms:");
+  LOG_PIN("  Flow Control Pin: ", this->flow_control_pin_);
   ESP_LOGCONFIG(TAG, "  RX timeout: %d ms", this->rx_timeout_);
 
   LOG_BINARY_SENSOR("", "Balancing", this->balancing_binary_sensor_);
@@ -550,6 +555,9 @@ bool JbdBms::change_mosfet_status(uint8_t address, uint8_t bitmask, bool state) 
 }
 
 bool JbdBms::write_register(uint8_t address, uint16_t value) {
+  if (this->flow_control_pin_ != nullptr)
+    this->flow_control_pin_->digital_write(true);
+
   uint8_t frame[9];
   uint8_t data_len = 2;
 
@@ -568,10 +576,16 @@ bool JbdBms::write_register(uint8_t address, uint16_t value) {
   this->write_array(frame, 9);
   this->flush();
 
+  if (this->flow_control_pin_ != nullptr)
+    this->flow_control_pin_->digital_write(false);
+
   return true;
 }
 
 void JbdBms::send_command(uint8_t action, uint8_t function) {
+  if (this->flow_control_pin_ != nullptr)
+    this->flow_control_pin_->digital_write(true);
+
   uint8_t frame[7];
   uint8_t data_len = 0;
 
@@ -586,11 +600,14 @@ void JbdBms::send_command(uint8_t action, uint8_t function) {
 
   this->write_array(frame, 7);
   this->flush();
+
+  if (this->flow_control_pin_ != nullptr)
+    this->flow_control_pin_->digital_write(false);
 }
 
 std::string JbdBms::bitmask_to_string_(const char *const messages[], const uint8_t &messages_size,
                                        const uint16_t &mask) {
-  std::string values = "";
+  std::string values;
   if (mask) {
     for (int i = 0; i < messages_size; i++) {
       if (mask & (1 << i)) {
@@ -605,5 +622,4 @@ std::string JbdBms::bitmask_to_string_(const char *const messages[], const uint8
   return values;
 }
 
-}  // namespace jbd_bms
-}  // namespace esphome
+}  // namespace esphome::jbd_bms
