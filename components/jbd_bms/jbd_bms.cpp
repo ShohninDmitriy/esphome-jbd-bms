@@ -1,4 +1,5 @@
 #include "jbd_bms.h"
+#include <array>
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 
@@ -64,7 +65,7 @@ void JbdBms::setup() {
   if (this->flow_control_pin_ != nullptr) {
     this->flow_control_pin_->setup();
   }
-  this->send_command(JBD_CMD_READ, JBD_CMD_HWINFO);
+  this->send_command(JBD_CMD_READ, JBD_CMD_HWINFO, nullptr, 0);
 }
 
 void JbdBms::loop() {
@@ -92,7 +93,7 @@ void JbdBms::loop() {
 
 void JbdBms::update() {
   this->track_online_status_();
-  this->send_command(JBD_CMD_READ, JBD_CMD_HWINFO);
+  this->send_command(JBD_CMD_READ, JBD_CMD_HWINFO, nullptr, 0);
 }
 
 bool JbdBms::parse_jbd_bms_byte_(uint8_t byte) {
@@ -175,7 +176,7 @@ void JbdBms::on_jbd_bms_data(const uint8_t &function, const std::vector<uint8_t>
   switch (function) {
     case JBD_CMD_HWINFO:
       this->on_hardware_info_data_(data);
-      this->send_command(JBD_CMD_READ, JBD_CMD_CELLINFO);
+      this->send_command(JBD_CMD_READ, JBD_CMD_CELLINFO, nullptr, 0);
       break;
     case JBD_CMD_CELLINFO:
       this->on_cell_info_data_(data);
@@ -315,11 +316,36 @@ void JbdBms::on_hardware_info_data_(const std::vector<uint8_t> &data) {
   uint32_t balance_status_bitmask = jbd_get_32bit(12);
   this->publish_state_(this->balancer_status_bitmask_sensor_, (float) balance_status_bitmask);
   this->publish_state_(this->balancing_binary_sensor_, balance_status_bitmask > 0);
+  uint8_t cells = data[21];
+  std::string balancing_cells;
+  for (uint8_t i = 0; i < cells; i++) {
+    if (balance_status_bitmask & (1u << (cells - 1 - i))) {
+      if (!balancing_cells.empty())
+        balancing_cells += ", ";
+      char buf[4];
+      snprintf(buf, sizeof(buf), "%u", i + 1);
+      balancing_cells += buf;
+    }
+  }
+  this->publish_state_(this->balancing_cells_text_sensor_, balancing_cells);
 
   // 16    2   0x00 0x00              Protection Status
   uint16_t errors_bitmask = jbd_get_16bit(16);
   this->publish_state_(this->errors_bitmask_sensor_, (float) errors_bitmask);
   this->publish_state_(this->errors_text_sensor_, this->bitmask_to_string_(ERRORS, ERRORS_SIZE, errors_bitmask));
+  this->publish_state_(this->cell_overvoltage_protection_binary_sensor_, errors_bitmask & (1 << 0));
+  this->publish_state_(this->cell_undervoltage_protection_binary_sensor_, errors_bitmask & (1 << 1));
+  this->publish_state_(this->pack_overvoltage_protection_binary_sensor_, errors_bitmask & (1 << 2));
+  this->publish_state_(this->pack_undervoltage_protection_binary_sensor_, errors_bitmask & (1 << 3));
+  this->publish_state_(this->charge_overtemperature_protection_binary_sensor_, errors_bitmask & (1 << 4));
+  this->publish_state_(this->charge_undertemperature_protection_binary_sensor_, errors_bitmask & (1 << 5));
+  this->publish_state_(this->discharge_overtemperature_protection_binary_sensor_, errors_bitmask & (1 << 6));
+  this->publish_state_(this->discharge_undertemperature_protection_binary_sensor_, errors_bitmask & (1 << 7));
+  this->publish_state_(this->charge_overcurrent_protection_binary_sensor_, errors_bitmask & (1 << 8));
+  this->publish_state_(this->discharge_overcurrent_protection_binary_sensor_, errors_bitmask & (1 << 9));
+  this->publish_state_(this->short_circuit_protection_binary_sensor_, errors_bitmask & (1 << 10));
+  this->publish_state_(this->ic_frontend_error_binary_sensor_, errors_bitmask & (1 << 11));
+  this->publish_state_(this->mosfet_software_lock_binary_sensor_, errors_bitmask & (1 << 12));
 
   // 18    1   0x80                   Version                                      0x10 = 1.0, 0x80 = 8.0
   this->publish_state_(this->software_version_sensor_, (data[18] >> 4) + ((data[18] & 0x0f) * 0.1f));
@@ -426,6 +452,21 @@ void JbdBms::dump_config() {  // NOLINT(google-readability-function-size,readabi
   LOG_BINARY_SENSOR("", "Charging", this->charging_binary_sensor_);
   LOG_BINARY_SENSOR("", "Discharging", this->discharging_binary_sensor_);
   LOG_BINARY_SENSOR("", "Online status", this->online_status_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Cell overvoltage protection", this->cell_overvoltage_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Cell undervoltage protection", this->cell_undervoltage_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Pack overvoltage protection", this->pack_overvoltage_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Pack undervoltage protection", this->pack_undervoltage_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Charge overtemperature protection", this->charge_overtemperature_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Charge undertemperature protection", this->charge_undertemperature_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Discharge overtemperature protection",
+                    this->discharge_overtemperature_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Discharge undertemperature protection",
+                    this->discharge_undertemperature_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Charge overcurrent protection", this->charge_overcurrent_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Discharge overcurrent protection", this->discharge_overcurrent_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Short circuit protection", this->short_circuit_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "IC front-end error", this->ic_frontend_error_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Mosfet Software Lock", this->mosfet_software_lock_binary_sensor_);
 
   LOG_SENSOR("", "Total voltage", this->total_voltage_sensor_);
   LOG_SENSOR("", "Battery strings", this->battery_strings_sensor_);
@@ -440,6 +481,7 @@ void JbdBms::dump_config() {  // NOLINT(google-readability-function-size,readabi
   LOG_SENSOR("", "Nominal capacity", this->nominal_capacity_sensor_);
   LOG_SENSOR("", "Charging cycles", this->charging_cycles_sensor_);
   LOG_SENSOR("", "Balancer status bitmask", balancer_status_bitmask_sensor_);
+  LOG_TEXT_SENSOR("", "Balancing cells", this->balancing_cells_text_sensor_);
   LOG_SENSOR("", "Capacity remaining", this->capacity_remaining_sensor_);
   LOG_SENSOR("", "Average cell voltage sensor", this->average_cell_voltage_sensor_);
   LOG_SENSOR("", "Delta cell voltage sensor", delta_cell_voltage_sensor_);
@@ -554,51 +596,35 @@ bool JbdBms::change_mosfet_status(uint8_t address, uint8_t bitmask, bool state) 
   return this->write_register(address, value);
 }
 
-bool JbdBms::write_register(uint8_t address, uint16_t value) {
-  if (this->flow_control_pin_ != nullptr)
-    this->flow_control_pin_->digital_write(true);
-
-  uint8_t frame[9];
-  uint8_t data_len = 2;
-
+std::vector<uint8_t> JbdBms::build_frame_(uint8_t command, uint8_t address, const uint8_t *data,
+                                          uint8_t data_len) const {
+  std::vector<uint8_t> frame(data_len + 7);
   frame[0] = JBD_PKT_START;
-  frame[1] = JBD_CMD_WRITE;
+  frame[1] = command;
   frame[2] = address;
   frame[3] = data_len;
-  frame[4] = value >> 8;
-  frame[5] = value >> 0;
-  auto crc = chksum_(frame + 2, data_len + 2);
-  frame[6] = crc >> 8;
-  frame[7] = crc >> 0;
-  frame[8] = JBD_PKT_END;
+  for (uint8_t i = 0; i < data_len; i++)
+    frame[4 + i] = data[i];
+  auto crc = chksum_(frame.data() + 2, data_len + 2);
+  frame[4 + data_len] = crc >> 8;
+  frame[5 + data_len] = crc >> 0;
+  frame[6 + data_len] = JBD_PKT_END;
+  return frame;
+}
 
-  ESP_LOGVV(TAG, "Send command: %s", format_hex_pretty(frame, sizeof(frame)).c_str());  // NOLINT
-  this->write_array(frame, 9);
-  this->flush();
-
-  if (this->flow_control_pin_ != nullptr)
-    this->flow_control_pin_->digital_write(false);
-
+bool JbdBms::write_register(uint8_t address, uint16_t value) {
+  uint8_t data[2] = {(uint8_t) (value >> 8), (uint8_t) (value)};
+  this->send_command(JBD_CMD_WRITE, address, data, 2);
   return true;
 }
 
-void JbdBms::send_command(uint8_t action, uint8_t function) {
+void JbdBms::send_command(uint8_t command, uint8_t address, const uint8_t *data, uint8_t data_len) {
   if (this->flow_control_pin_ != nullptr)
     this->flow_control_pin_->digital_write(true);
 
-  uint8_t frame[7];
-  uint8_t data_len = 0;
-
-  frame[0] = JBD_PKT_START;
-  frame[1] = action;
-  frame[2] = function;
-  frame[3] = data_len;
-  auto crc = chksum_(frame + 2, data_len + 2);
-  frame[4] = crc >> 8;
-  frame[5] = crc >> 0;
-  frame[6] = JBD_PKT_END;
-
-  this->write_array(frame, 7);
+  auto frame = build_frame_(command, address, data, data_len);
+  ESP_LOGVV(TAG, "Send command: %s", format_hex_pretty(frame.data(), frame.size()).c_str());  // NOLINT
+  this->write_array(frame.data(), frame.size());
   this->flush();
 
   if (this->flow_control_pin_ != nullptr)

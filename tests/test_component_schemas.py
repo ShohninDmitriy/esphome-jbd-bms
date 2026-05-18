@@ -15,6 +15,7 @@ from components.jbd_bms import (  # noqa: E402  # noqa: E402
 )
 import components.jbd_bms_ble as hub_ble  # noqa: E402
 from components.jbd_bms_ble import (  # noqa: E402
+    binary_sensor as ble_binary_sensor,  # noqa: E402
     button as ble_button,  # noqa: E402
     sensor as ble_sensor,
     switch as ble_switch,  # noqa: E402
@@ -63,6 +64,23 @@ class TestSensorLists:
             assert key not in sensor.TEMPERATURES
 
 
+PROTECTION_KEYS = [
+    "cell_overvoltage_protection",
+    "cell_undervoltage_protection",
+    "pack_overvoltage_protection",
+    "pack_undervoltage_protection",
+    "charge_overtemperature_protection",
+    "charge_undertemperature_protection",
+    "discharge_overtemperature_protection",
+    "discharge_undertemperature_protection",
+    "charge_overcurrent_protection",
+    "discharge_overcurrent_protection",
+    "short_circuit_protection",
+    "ic_frontend_error",
+    "mosfet_software_lock",
+]
+
+
 class TestBinarySensorConstants:
     def test_binary_sensor_defs_dict(self):
         from components.jbd_bms.const import CONF_CHARGING, CONF_DISCHARGING
@@ -71,7 +89,30 @@ class TestBinarySensorConstants:
         assert CONF_DISCHARGING in binary_sensor.BINARY_SENSOR_DEFS
         assert binary_sensor.CONF_BALANCING in binary_sensor.BINARY_SENSOR_DEFS
         assert binary_sensor.CONF_ONLINE_STATUS in binary_sensor.BINARY_SENSOR_DEFS
-        assert len(binary_sensor.BINARY_SENSOR_DEFS) == 4
+        assert len(binary_sensor.BINARY_SENSOR_DEFS) == 17
+
+    def test_protection_sensors_in_defs(self):
+        for key in PROTECTION_KEYS:
+            assert (
+                key in binary_sensor.BINARY_SENSOR_DEFS
+            ), f"{key} missing from jbd_bms BINARY_SENSOR_DEFS"
+
+    def test_ble_binary_sensor_defs_dict(self):
+        from components.jbd_bms_ble.const import CONF_CHARGING, CONF_DISCHARGING
+
+        assert CONF_CHARGING in ble_binary_sensor.BINARY_SENSOR_DEFS
+        assert CONF_DISCHARGING in ble_binary_sensor.BINARY_SENSOR_DEFS
+        assert ble_binary_sensor.CONF_BALANCING in ble_binary_sensor.BINARY_SENSOR_DEFS
+        assert (
+            ble_binary_sensor.CONF_ONLINE_STATUS in ble_binary_sensor.BINARY_SENSOR_DEFS
+        )
+        assert len(ble_binary_sensor.BINARY_SENSOR_DEFS) == 17
+
+    def test_ble_protection_sensors_in_defs(self):
+        for key in PROTECTION_KEYS:
+            assert (
+                key in ble_binary_sensor.BINARY_SENSOR_DEFS
+            ), f"{key} missing from jbd_bms_ble BINARY_SENSOR_DEFS"
 
 
 class TestTextSensorConstants:
@@ -79,11 +120,13 @@ class TestTextSensorConstants:
         assert text_sensor.CONF_ERRORS in text_sensor.TEXT_SENSORS
         assert text_sensor.CONF_OPERATION_STATUS in text_sensor.TEXT_SENSORS
         assert text_sensor.CONF_DEVICE_MODEL in text_sensor.TEXT_SENSORS
-        assert len(text_sensor.TEXT_SENSORS) == 3
+        assert text_sensor.CONF_BALANCING_CELLS in text_sensor.TEXT_SENSORS
+        assert len(text_sensor.TEXT_SENSORS) == 4
 
     def test_ble_text_sensors_list(self):
         assert ble_text_sensor.CONF_ERRORS in ble_text_sensor.TEXT_SENSORS
-        assert len(ble_text_sensor.TEXT_SENSORS) == 3
+        assert ble_text_sensor.CONF_BALANCING_CELLS in ble_text_sensor.TEXT_SENSORS
+        assert len(ble_text_sensor.TEXT_SENSORS) == 4
 
 
 class TestSwitchConstants:
@@ -109,12 +152,56 @@ class TestButtonConstants:
         assert button.CONF_RETRIEVE_HARDWARE_VERSION in button.BUTTONS
         assert button.CONF_RETRIEVE_ERROR_COUNTS in button.BUTTONS
         assert button.CONF_FORCE_SOC_RESET in button.BUTTONS
-        assert len(button.BUTTONS) == 3
+        assert button.CONF_AUTOMATIC_BALANCING in button.BUTTONS
+        assert button.CONF_CLEAR_ALARM in button.BUTTONS
+        assert len(button.BUTTONS) == 5
 
-    def test_button_addresses_are_unique(self):
-        addresses = list(button.BUTTONS.values())
-        assert len(addresses) == len(set(addresses))
+    def test_button_payloads(self):
+        assert button.BUTTONS[button.CONF_FORCE_SOC_RESET] == (
+            button.JBD_CMD_WRITE,
+            0x0A,
+            [0x01, 0x00],
+        )
+        assert button.BUTTONS[button.CONF_AUTOMATIC_BALANCING] == (
+            button.JBD_CMD_WRITE,
+            0x0A,
+            [0x07, 0x00],
+        )
+        assert button.BUTTONS[button.CONF_CLEAR_ALARM] == (
+            button.JBD_CMD_WRITE,
+            0x0A,
+            [0x04, 0x00],
+        )
+        assert button.BUTTONS[button.CONF_RETRIEVE_HARDWARE_VERSION] == (
+            button.JBD_CMD_READ,
+            0x05,
+            [],
+        )
 
     def test_ble_buttons_dict(self):
         assert ble_button.CONF_RETRIEVE_HARDWARE_VERSION in ble_button.BUTTONS
-        assert len(ble_button.BUTTONS) == 3
+        assert ble_button.CONF_AUTOMATIC_BALANCING in ble_button.BUTTONS
+        assert ble_button.CONF_CLEAR_ALARM in ble_button.BUTTONS
+        assert len(ble_button.BUTTONS) == 5
+
+    def test_ble_button_payloads(self):
+        assert ble_button.BUTTONS[ble_button.CONF_FORCE_SOC_RESET] == (
+            ble_button.JBD_CMD_WRITE,
+            0x0A,
+            [0x01, 0x00],
+        )
+        assert ble_button.BUTTONS[ble_button.CONF_AUTOMATIC_BALANCING] == (
+            ble_button.JBD_CMD_WRITE,
+            0x0A,
+            [0x07, 0x00],
+        )
+        assert ble_button.BUTTONS[ble_button.CONF_CLEAR_ALARM] == (
+            ble_button.JBD_CMD_WRITE,
+            0x0A,
+            [0x04, 0x00],
+        )
+        assert ble_button.BUTTONS[ble_button.CONF_RETRIEVE_HARDWARE_VERSION] == (
+            ble_button.JBD_CMD_READ,
+            0x05,
+            [],
+        )

@@ -555,11 +555,36 @@ void JbdBmsBle::on_hardware_info_data_(const std::vector<uint8_t> &data) {
   uint32_t balance_status_bitmask = jbd_get_32bit(12);
   this->publish_state_(this->balancer_status_bitmask_sensor_, (float) balance_status_bitmask);
   this->publish_state_(this->balancing_binary_sensor_, balance_status_bitmask > 0);
+  uint8_t cells = data[21];
+  std::string balancing_cells;
+  for (uint8_t i = 0; i < cells; i++) {
+    if (balance_status_bitmask & (1u << (cells - 1 - i))) {
+      if (!balancing_cells.empty())
+        balancing_cells += ", ";
+      char buf[4];
+      snprintf(buf, sizeof(buf), "%u", i + 1);
+      balancing_cells += buf;
+    }
+  }
+  this->publish_state_(this->balancing_cells_text_sensor_, balancing_cells);
 
   // 16    2   0x00 0x00              Protection Status
   uint16_t errors_bitmask = jbd_get_16bit(16);
   this->publish_state_(this->errors_bitmask_sensor_, (float) errors_bitmask);
   this->publish_state_(this->errors_text_sensor_, this->bitmask_to_string_(ERRORS, ERRORS_SIZE, errors_bitmask));
+  this->publish_state_(this->cell_overvoltage_protection_binary_sensor_, errors_bitmask & (1 << 0));
+  this->publish_state_(this->cell_undervoltage_protection_binary_sensor_, errors_bitmask & (1 << 1));
+  this->publish_state_(this->pack_overvoltage_protection_binary_sensor_, errors_bitmask & (1 << 2));
+  this->publish_state_(this->pack_undervoltage_protection_binary_sensor_, errors_bitmask & (1 << 3));
+  this->publish_state_(this->charge_overtemperature_protection_binary_sensor_, errors_bitmask & (1 << 4));
+  this->publish_state_(this->charge_undertemperature_protection_binary_sensor_, errors_bitmask & (1 << 5));
+  this->publish_state_(this->discharge_overtemperature_protection_binary_sensor_, errors_bitmask & (1 << 6));
+  this->publish_state_(this->discharge_undertemperature_protection_binary_sensor_, errors_bitmask & (1 << 7));
+  this->publish_state_(this->charge_overcurrent_protection_binary_sensor_, errors_bitmask & (1 << 8));
+  this->publish_state_(this->discharge_overcurrent_protection_binary_sensor_, errors_bitmask & (1 << 9));
+  this->publish_state_(this->short_circuit_protection_binary_sensor_, errors_bitmask & (1 << 10));
+  this->publish_state_(this->ic_frontend_error_binary_sensor_, errors_bitmask & (1 << 11));
+  this->publish_state_(this->mosfet_software_lock_binary_sensor_, errors_bitmask & (1 << 12));
 
   // 18    1   0x80                   Version                                      0x10 = 1.0, 0x80 = 8.0
   this->publish_state_(this->software_version_sensor_, (data[18] >> 4) + ((data[18] & 0x0f) * 0.1f));
@@ -691,6 +716,21 @@ void JbdBmsBle::dump_config() {  // NOLINT(google-readability-function-size,read
   LOG_BINARY_SENSOR("", "Charging", this->charging_binary_sensor_);
   LOG_BINARY_SENSOR("", "Discharging", this->discharging_binary_sensor_);
   LOG_BINARY_SENSOR("", "Online status", this->online_status_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Cell overvoltage protection", this->cell_overvoltage_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Cell undervoltage protection", this->cell_undervoltage_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Pack overvoltage protection", this->pack_overvoltage_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Pack undervoltage protection", this->pack_undervoltage_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Charge overtemperature protection", this->charge_overtemperature_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Charge undertemperature protection", this->charge_undertemperature_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Discharge overtemperature protection",
+                    this->discharge_overtemperature_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Discharge undertemperature protection",
+                    this->discharge_undertemperature_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Charge overcurrent protection", this->charge_overcurrent_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Discharge overcurrent protection", this->discharge_overcurrent_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Short circuit protection", this->short_circuit_protection_binary_sensor_);
+  LOG_BINARY_SENSOR("", "IC front-end error", this->ic_frontend_error_binary_sensor_);
+  LOG_BINARY_SENSOR("", "Mosfet Software Lock", this->mosfet_software_lock_binary_sensor_);
 
   LOG_SENSOR("", "Total voltage", this->total_voltage_sensor_);
   LOG_SENSOR("", "Battery strings", this->battery_strings_sensor_);
@@ -766,6 +806,7 @@ void JbdBmsBle::dump_config() {  // NOLINT(google-readability-function-size,read
   LOG_TEXT_SENSOR("", "Operation status", this->operation_status_text_sensor_);
   LOG_TEXT_SENSOR("", "Errors", this->errors_text_sensor_);
   LOG_TEXT_SENSOR("", "Device model", this->device_model_text_sensor_);
+  LOG_TEXT_SENSOR("", "Balancing cells", this->balancing_cells_text_sensor_);
 }
 
 void JbdBmsBle::publish_state_(binary_sensor::BinarySensor *binary_sensor, const bool &state) {
@@ -796,7 +837,22 @@ void JbdBmsBle::publish_state_(text_sensor::TextSensor *text_sensor, const std::
   text_sensor->publish_state(state);
 }
 
-#ifdef USE_ESP32
+std::vector<uint8_t> JbdBmsBle::build_frame_(uint8_t command, uint8_t address, const uint8_t *data,
+                                             uint8_t data_len) const {
+  std::vector<uint8_t> frame(data_len + 7);
+  frame[0] = JBD_PKT_START;
+  frame[1] = command;
+  frame[2] = address;
+  frame[3] = data_len;
+  for (uint8_t i = 0; i < data_len; i++)
+    frame[4 + i] = data[i];
+  auto crc = chksum_(frame.data() + 2, data_len + 2);
+  frame[4 + data_len] = crc >> 8;
+  frame[5 + data_len] = crc >> 0;
+  frame[6 + data_len] = JBD_PKT_END;
+  return frame;
+}
+
 bool JbdBmsBle::change_mosfet_status(uint8_t address, uint8_t bitmask, bool state) {
   if (this->mosfet_status_ == 255) {
     ESP_LOGE(TAG, "Unable to change the Mosfet status because it's unknown");
@@ -813,52 +869,14 @@ bool JbdBmsBle::change_mosfet_status(uint8_t address, uint8_t bitmask, bool stat
   return this->write_register(address, value);
 }
 
-bool JbdBmsBle::write_register(uint8_t address, uint16_t value) {
-  uint8_t frame[9];
-  uint8_t data_len = 2;
-
-  frame[0] = JBD_PKT_START;
-  frame[1] = JBD_CMD_WRITE;
-  frame[2] = address;
-  frame[3] = data_len;
-  frame[4] = value >> 8;
-  frame[5] = value >> 0;
-  auto crc = chksum_(frame + 2, data_len + 2);
-  frame[6] = crc >> 8;
-  frame[7] = crc >> 0;
-  frame[8] = JBD_PKT_END;
-
+#ifdef USE_ESP32
+bool JbdBmsBle::send_command(uint8_t command, uint8_t address, const uint8_t *data, uint8_t data_len) {
+  auto frame = build_frame_(command, address, data, data_len);
   ESP_LOGV(TAG, "Send command (handle 0x%02X): %s", this->char_command_handle_,
-           format_hex_pretty(frame, sizeof(frame)).c_str());  // NOLINT
+           format_hex_pretty(frame.data(), frame.size()).c_str());  // NOLINT
   auto status =
       esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(), this->char_command_handle_,
-                               sizeof(frame), frame, ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
-
-  if (status) {
-    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", ADDR_STR(this->parent_->address_str()), status);
-  }
-
-  return (status == 0);
-}
-
-bool JbdBmsBle::send_command(uint8_t action, uint8_t function) {
-  uint8_t frame[7];
-  uint8_t data_len = 0;
-
-  frame[0] = JBD_PKT_START;
-  frame[1] = action;
-  frame[2] = function;
-  frame[3] = data_len;
-  auto crc = chksum_(frame + 2, data_len + 2);
-  frame[4] = crc >> 8;
-  frame[5] = crc >> 0;
-  frame[6] = JBD_PKT_END;
-
-  ESP_LOGV(TAG, "Send command (handle 0x%02X): %s", this->char_command_handle_,
-           format_hex_pretty(frame, sizeof(frame)).c_str());  // NOLINT
-  auto status =
-      esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(), this->char_command_handle_,
-                               sizeof(frame), frame, ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
+                               frame.size(), frame.data(), ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
 
   if (status) {
     ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", ADDR_STR(this->parent_->address_str()), status);
@@ -867,8 +885,13 @@ bool JbdBmsBle::send_command(uint8_t action, uint8_t function) {
   return (status == 0);
 }
 #else
-bool JbdBmsBle::send_command(uint8_t action, uint8_t function) { return false; }
+bool JbdBmsBle::send_command(uint8_t command, uint8_t address, const uint8_t *data, uint8_t data_len) { return false; }
 #endif  // USE_ESP32
+
+bool JbdBmsBle::write_register(uint8_t address, uint16_t value) {
+  uint8_t data[2] = {(uint8_t) (value >> 8), (uint8_t) (value)};
+  return this->send_command(JBD_CMD_WRITE, address, data, 2);
+}
 
 std::string JbdBmsBle::bitmask_to_string_(const char *const messages[], const uint8_t &messages_size,
                                           const uint16_t &mask) {

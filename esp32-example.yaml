@@ -86,6 +86,10 @@ button:
       name: "retrieve error counts"
     force_soc_reset:
       name: "force soc reset"
+    automatic_balancing:
+      name: "automatic balancing"
+    clear_alarm:
+      name: "clear alarm"
 
 binary_sensor:
   - platform: jbd_bms
@@ -98,6 +102,32 @@ binary_sensor:
       name: "discharging"
     online_status:
       name: "online status"
+    cell_overvoltage_protection:
+      name: "cell overvoltage protection"
+    cell_undervoltage_protection:
+      name: "cell undervoltage protection"
+    pack_overvoltage_protection:
+      name: "pack overvoltage protection"
+    pack_undervoltage_protection:
+      name: "pack undervoltage protection"
+    charge_overtemperature_protection:
+      name: "charge overtemperature protection"
+    charge_undertemperature_protection:
+      name: "charge undertemperature protection"
+    discharge_overtemperature_protection:
+      name: "discharge overtemperature protection"
+    discharge_undertemperature_protection:
+      name: "discharge undertemperature protection"
+    charge_overcurrent_protection:
+      name: "charge overcurrent protection"
+    discharge_overcurrent_protection:
+      name: "discharge overcurrent protection"
+    short_circuit_protection:
+      name: "short circuit protection"
+    ic_frontend_error:
+      name: "ic frontend error"
+    mosfet_software_lock:
+      name: "mosfet software lock"
 
 sensor:
   - platform: jbd_bms
@@ -265,6 +295,8 @@ text_sensor:
       name: "operation status"
     device_model:
       name: "device model"
+    balancing_cells:
+      name: "balancing cells"
 
 select:
   - platform: jbd_bms
