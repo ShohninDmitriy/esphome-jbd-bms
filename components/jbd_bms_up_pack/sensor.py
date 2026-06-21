@@ -3,6 +3,8 @@ from esphome.components import sensor
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_CURRENT,
+    CONF_MAX_TEMPERATURE,
+    CONF_MIN_TEMPERATURE,
     CONF_POWER,
     DEVICE_CLASS_BATTERY,
     DEVICE_CLASS_CURRENT,
@@ -22,7 +24,11 @@ from esphome.const import (
     UNIT_WATT,
 )
 
-from . import CONF_JBD_BMS_UP_PACK_ID, JBD_BMS_UP_PACK_COMPONENT_SCHEMA
+from . import (
+    CONF_JBD_BMS_UP_PACK_ID,
+    JBD_BMS_UP_PACK_COMPONENT_SCHEMA,
+    deprecated_renames,
+)
 
 DEPENDENCIES = ["jbd_bms_up_pack"]
 
@@ -34,8 +40,10 @@ CONF_DISCHARGING_POWER = "discharging_power"
 CONF_STATE_OF_CHARGE = "state_of_charge"
 CONF_CAPACITY_REMAINING = "capacity_remaining"
 CONF_NOMINAL_CAPACITY = "nominal_capacity"
+CONF_RATED_CAPACITY = "rated_capacity"
 CONF_MOSFET_TEMPERATURE = "mosfet_temperature"
 CONF_AMBIENT_TEMPERATURE = "ambient_temperature"
+CONF_AVERAGE_TEMPERATURE = "average_temperature"
 CONF_STATE_OF_HEALTH = "state_of_health"
 CONF_OPERATION_STATUS_BITMASK = "operation_status_bitmask"
 CONF_ERRORS_BITMASK = "errors_bitmask"
@@ -47,7 +55,12 @@ CONF_MIN_VOLTAGE_CELL = "min_voltage_cell"
 CONF_MAX_VOLTAGE_CELL = "max_voltage_cell"
 CONF_DELTA_CELL_VOLTAGE = "delta_cell_voltage"
 CONF_AVERAGE_CELL_VOLTAGE = "average_cell_voltage"
-CONF_BATTERY_STRINGS = "battery_strings"
+CONF_CELL_COUNT = "cell_count"
+CONF_CHARGE_VOLTAGE_LIMIT = "charge_voltage_limit"
+CONF_CHARGE_CURRENT_LIMIT = "charge_current_limit"
+CONF_DISCHARGE_VOLTAGE_LIMIT = "discharge_voltage_limit"
+CONF_DISCHARGE_CURRENT_LIMIT = "discharge_current_limit"
+CONF_BALANCING_BITMASK = "balancing_bitmask"
 
 ICON_CURRENT_DC = "mdi:current-dc"
 ICON_CAPACITY_REMAINING = "mdi:battery-50"
@@ -60,7 +73,8 @@ ICON_MAX_VOLTAGE_CELL = "mdi:battery-plus-outline"
 ICON_OPERATION_STATUS_BITMASK = "mdi:heart-pulse"
 ICON_ERRORS_BITMASK = "mdi:alert-circle-outline"
 ICON_PROTECT_BITMASK = "mdi:shield-alert-outline"
-ICON_BATTERY_STRINGS = "mdi:car-battery"
+ICON_CELL_COUNT = "mdi:car-battery"
+ICON_BALANCING_BITMASK = "mdi:seesaw"
 
 UNIT_AMPERE_HOURS = "Ah"
 
@@ -123,6 +137,14 @@ SENSOR_DEFS = {
         "device_class": DEVICE_CLASS_EMPTY,
         "state_class": STATE_CLASS_MEASUREMENT,
     },
+    CONF_RATED_CAPACITY: {
+        "unit_of_measurement": UNIT_AMPERE_HOURS,
+        "icon": ICON_NOMINAL_CAPACITY,
+        "accuracy_decimals": 2,
+        "device_class": DEVICE_CLASS_EMPTY,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
     CONF_MOSFET_TEMPERATURE: {
         "unit_of_measurement": UNIT_CELSIUS,
         "icon": ICON_EMPTY,
@@ -131,6 +153,27 @@ SENSOR_DEFS = {
         "state_class": STATE_CLASS_MEASUREMENT,
     },
     CONF_AMBIENT_TEMPERATURE: {
+        "unit_of_measurement": UNIT_CELSIUS,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 1,
+        "device_class": DEVICE_CLASS_TEMPERATURE,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
+    CONF_MAX_TEMPERATURE: {
+        "unit_of_measurement": UNIT_CELSIUS,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 1,
+        "device_class": DEVICE_CLASS_TEMPERATURE,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
+    CONF_MIN_TEMPERATURE: {
+        "unit_of_measurement": UNIT_CELSIUS,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 1,
+        "device_class": DEVICE_CLASS_TEMPERATURE,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
+    CONF_AVERAGE_TEMPERATURE: {
         "unit_of_measurement": UNIT_CELSIUS,
         "icon": ICON_EMPTY,
         "accuracy_decimals": 1,
@@ -217,9 +260,49 @@ SENSOR_DEFS = {
         "device_class": DEVICE_CLASS_VOLTAGE,
         "state_class": STATE_CLASS_MEASUREMENT,
     },
-    CONF_BATTERY_STRINGS: {
+    CONF_CELL_COUNT: {
         "unit_of_measurement": UNIT_EMPTY,
-        "icon": ICON_BATTERY_STRINGS,
+        "icon": ICON_CELL_COUNT,
+        "accuracy_decimals": 0,
+        "device_class": DEVICE_CLASS_EMPTY,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
+    CONF_CHARGE_VOLTAGE_LIMIT: {
+        "unit_of_measurement": UNIT_VOLT,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 1,
+        "device_class": DEVICE_CLASS_VOLTAGE,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
+    CONF_CHARGE_CURRENT_LIMIT: {
+        "unit_of_measurement": UNIT_AMPERE,
+        "icon": ICON_CURRENT_DC,
+        "accuracy_decimals": 1,
+        "device_class": DEVICE_CLASS_CURRENT,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
+    CONF_DISCHARGE_VOLTAGE_LIMIT: {
+        "unit_of_measurement": UNIT_VOLT,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 1,
+        "device_class": DEVICE_CLASS_VOLTAGE,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
+    CONF_DISCHARGE_CURRENT_LIMIT: {
+        "unit_of_measurement": UNIT_AMPERE,
+        "icon": ICON_CURRENT_DC,
+        "accuracy_decimals": 1,
+        "device_class": DEVICE_CLASS_CURRENT,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
+    CONF_BALANCING_BITMASK: {
+        "unit_of_measurement": UNIT_EMPTY,
+        "icon": ICON_BALANCING_BITMASK,
         "accuracy_decimals": 0,
         "device_class": DEVICE_CLASS_EMPTY,
         "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
@@ -227,7 +310,12 @@ SENSOR_DEFS = {
     },
 }
 
-CONFIG_SCHEMA = (
+_RENAMED_SENSORS = {
+    "battery_strings": "cell_count",
+}
+
+CONFIG_SCHEMA = cv.All(
+    deprecated_renames(_RENAMED_SENSORS),
     JBD_BMS_UP_PACK_COMPONENT_SCHEMA.extend(
         {
             cv.Optional(key): sensor.sensor_schema(**kwargs)
@@ -257,7 +345,7 @@ CONFIG_SCHEMA = (
             )
             for temp in TEMPERATURES
         }
-    )
+    ),
 )
 
 

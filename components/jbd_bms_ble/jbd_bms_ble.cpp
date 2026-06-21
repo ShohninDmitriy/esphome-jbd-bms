@@ -15,10 +15,6 @@ static const char *const TAG = "jbd_bms_ble";
 
 static const uint8_t MAX_NO_RESPONSE_COUNT = 10;
 
-static const uint16_t JBD_BMS_SERVICE_UUID = 0xFF00;
-static const uint16_t JBD_BMS_NOTIFY_CHARACTERISTIC_UUID = 0xFF01;
-static const uint16_t JBD_BMS_CONTROL_CHARACTERISTIC_UUID = 0xFF02;
-
 static const uint16_t MAX_RESPONSE_SIZE = 41;
 
 static const uint8_t JBD_PKT_START = 0xDD;
@@ -114,7 +110,7 @@ void JbdBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t ga
       break;
     }
     case ESP_GATTC_SEARCH_CMPL_EVT: {
-      auto *char_notify = this->parent_->get_characteristic(JBD_BMS_SERVICE_UUID, JBD_BMS_NOTIFY_CHARACTERISTIC_UUID);
+      auto *char_notify = this->parent_->get_characteristic(this->service_uuid_, this->notify_char_uuid_);
       if (char_notify == nullptr) {
         ESP_LOGE(TAG, "[%s] No notify service found at device, not an JBD BMS..?",
                  ADDR_STR(this->parent_->address_str()));
@@ -128,7 +124,7 @@ void JbdBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t ga
         ESP_LOGW(TAG, "esp_ble_gattc_register_for_notify failed, status=%d", status);
       }
 
-      auto *char_command = this->parent_->get_characteristic(JBD_BMS_SERVICE_UUID, JBD_BMS_CONTROL_CHARACTERISTIC_UUID);
+      auto *char_command = this->parent_->get_characteristic(this->service_uuid_, this->control_char_uuid_);
       if (char_command == nullptr) {
         ESP_LOGE(TAG, "[%s] No control service found at device, not an JBD BMS..?",
                  ADDR_STR(this->parent_->address_str()));
@@ -604,7 +600,7 @@ void JbdBmsBle::on_hardware_info_data_(const std::vector<uint8_t> &data) {
   this->publish_state_(this->discharging_switch_, operation_status & JBD_MOS_DISCHARGE);
 
   // 21    2   0x04                   Cell count
-  this->publish_state_(this->battery_strings_sensor_, data[21]);
+  this->publish_state_(this->cell_count_sensor_, data[21]);
 
   // 22    3   0x03                   Temperature sensors
   // 23    2   0x0B 0x8D              Temperature 1
@@ -696,7 +692,7 @@ void JbdBmsBle::publish_device_unavailable_() {
   this->publish_state_(operation_status_bitmask_sensor_, NAN);
   this->publish_state_(errors_bitmask_sensor_, NAN);
   this->publish_state_(balancer_status_bitmask_sensor_, NAN);
-  this->publish_state_(battery_strings_sensor_, NAN);
+  this->publish_state_(cell_count_sensor_, NAN);
   this->publish_state_(temperature_sensors_sensor_, NAN);
   this->publish_state_(software_version_sensor_, NAN);
 
@@ -711,6 +707,9 @@ void JbdBmsBle::publish_device_unavailable_() {
 
 void JbdBmsBle::dump_config() {  // NOLINT(google-readability-function-size,readability-function-size)
   ESP_LOGCONFIG(TAG, "JbdBmsBle:");
+  ESP_LOGCONFIG(TAG, "  Service UUID: 0x%04X", this->service_uuid_);
+  ESP_LOGCONFIG(TAG, "  Notify Characteristic UUID: 0x%04X", this->notify_char_uuid_);
+  ESP_LOGCONFIG(TAG, "  Control Characteristic UUID: 0x%04X", this->control_char_uuid_);
 
   LOG_BINARY_SENSOR("", "Balancing", this->balancing_binary_sensor_);
   LOG_BINARY_SENSOR("", "Charging", this->charging_binary_sensor_);
@@ -733,7 +732,7 @@ void JbdBmsBle::dump_config() {  // NOLINT(google-readability-function-size,read
   LOG_BINARY_SENSOR("", "Mosfet Software Lock", this->mosfet_software_lock_binary_sensor_);
 
   LOG_SENSOR("", "Total voltage", this->total_voltage_sensor_);
-  LOG_SENSOR("", "Battery strings", this->battery_strings_sensor_);
+  LOG_SENSOR("", "Cell count", this->cell_count_sensor_);
   LOG_SENSOR("", "Software version", this->software_version_sensor_);
   LOG_SENSOR("", "Current", this->current_sensor_);
   LOG_SENSOR("", "Power", this->power_sensor_);

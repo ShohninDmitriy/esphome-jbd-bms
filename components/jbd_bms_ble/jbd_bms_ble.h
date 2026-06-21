@@ -145,9 +145,7 @@ class JbdBmsBle :
   void set_balancer_status_bitmask_sensor(sensor::Sensor *balancer_status_bitmask_sensor) {
     balancer_status_bitmask_sensor_ = balancer_status_bitmask_sensor;
   }
-  void set_battery_strings_sensor(sensor::Sensor *battery_strings_sensor) {
-    battery_strings_sensor_ = battery_strings_sensor;
-  }
+  void set_cell_count_sensor(sensor::Sensor *cell_count_sensor) { cell_count_sensor_ = cell_count_sensor; }
   void set_temperature_sensors_sensor(sensor::Sensor *temperature_sensors_sensor) {
     temperature_sensors_sensor_ = temperature_sensors_sensor;
   }
@@ -212,6 +210,9 @@ class JbdBmsBle :
   void set_balancing_cells_text_sensor(text_sensor::TextSensor *balancing_cells_text_sensor) {
     balancing_cells_text_sensor_ = balancing_cells_text_sensor;
   }
+  void set_service_uuid(uint16_t uuid) { service_uuid_ = uuid; }
+  void set_notify_characteristic_uuid(uint16_t uuid) { notify_char_uuid_ = uuid; }
+  void set_control_characteristic_uuid(uint16_t uuid) { control_char_uuid_ = uuid; }
   void set_password(const std::string &password) {
     password_ = password;
     enable_authentication_ = !password.empty();
@@ -263,7 +264,7 @@ class JbdBmsBle :
   sensor::Sensor *operation_status_bitmask_sensor_{nullptr};
   sensor::Sensor *errors_bitmask_sensor_{nullptr};
   sensor::Sensor *balancer_status_bitmask_sensor_{nullptr};
-  sensor::Sensor *battery_strings_sensor_{nullptr};
+  sensor::Sensor *cell_count_sensor_{nullptr};
   sensor::Sensor *temperature_sensors_sensor_{nullptr};
   sensor::Sensor *software_version_sensor_{nullptr};
   sensor::Sensor *short_circuit_error_count_sensor_{nullptr};
@@ -301,6 +302,10 @@ class JbdBmsBle :
   // Cycle life
   // Production date
   // Version
+
+  uint16_t service_uuid_{0xFF00};
+  uint16_t notify_char_uuid_{0xFF01};
+  uint16_t control_char_uuid_{0xFF02};
 
   std::vector<uint8_t> frame_buffer_;
   std::string device_model_{};

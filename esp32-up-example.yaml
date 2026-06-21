@@ -1,7 +1,7 @@
 substitutions:
   name: jbd-bms-up
   device_description: "Monitor a JBD UP16S010 BMS via RS485 (UP protocol)"
-  external_components_source: github://syssi/esphome-jbd-bms@add-jbd-bms-up-component
+  external_components_source: github://syssi/esphome-jbd-bms@main
   tx_pin: GPIO16
   rx_pin: GPIO17
   rx_timeout: 150ms
@@ -57,6 +57,8 @@ jbd_bms_up_pack:
 binary_sensor:
   - platform: jbd_bms_up_pack
     jbd_bms_up_pack_id: bms0
+    balancing:
+      name: "${name} balancing"
     charging:
       name: "${name} charging"
     discharging:
@@ -91,12 +93,28 @@ sensor:
       name: "${name} capacity remaining"
     nominal_capacity:
       name: "${name} nominal capacity"
+    rated_capacity:
+      name: "${name} rated capacity"
     charging_cycles:
       name: "${name} charging cycles"
     mosfet_temperature:
       name: "${name} mosfet temperature"
     ambient_temperature:
       name: "${name} ambient temperature"
+    max_temperature:
+      name: "${name} max temperature"
+    min_temperature:
+      name: "${name} min temperature"
+    average_temperature:
+      name: "${name} average temperature"
+    charge_voltage_limit:
+      name: "${name} charge voltage limit"
+    charge_current_limit:
+      name: "${name} charge current limit"
+    discharge_voltage_limit:
+      name: "${name} discharge voltage limit"
+    discharge_current_limit:
+      name: "${name} discharge current limit"
     min_cell_voltage:
       name: "${name} min cell voltage"
     max_cell_voltage:
@@ -109,7 +127,7 @@ sensor:
       name: "${name} delta cell voltage"
     average_cell_voltage:
       name: "${name} average cell voltage"
-    battery_strings:
+    cell_count:
       name: "${name} battery strings"
     operation_status_bitmask:
       name: "${name} operation status bitmask"
@@ -117,6 +135,8 @@ sensor:
       name: "${name} errors bitmask"
     protect_bitmask:
       name: "${name} protect bitmask"
+    balancing_bitmask:
+      name: "${name} balancing bitmask"
     cell_voltage_1:
       name: "${name} cell voltage 1"
     cell_voltage_2:
@@ -205,6 +225,8 @@ switch:
 text_sensor:
   - platform: jbd_bms_up_pack
     jbd_bms_up_pack_id: bms0
+    firmware_version:
+      name: "${name} firmware version"
     operation_status:
       name: "${name} operation status"
     errors:

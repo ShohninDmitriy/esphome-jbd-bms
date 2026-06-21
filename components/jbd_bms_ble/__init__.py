@@ -1,16 +1,38 @@
+import logging
+
 import esphome.codegen as cg
 from esphome.components import ble_client
 import esphome.config_validation as cv
-from esphome.const import CONF_ID, CONF_PASSWORD
+from esphome.const import CONF_ID, CONF_PASSWORD, CONF_SERVICE_UUID
 
-CONF_AUTH_TIMEOUT = "auth_timeout"
+_LOGGER = logging.getLogger(__name__)
 
 CODEOWNERS = ["@syssi"]
 DEPENDENCIES = ["ble_client"]
 AUTO_LOAD = ["binary_sensor", "button", "select", "sensor", "switch", "text_sensor"]
 MULTI_CONF = True
 
+
+def deprecated_renames(renames: dict[str, str]):
+    def validator(config):
+        config = config.copy()
+        for old, new in renames.items():
+            if old in config:
+                _LOGGER.warning(
+                    "'%s' is deprecated, use '%s' instead. Will be removed in a future release.",
+                    old,
+                    new,
+                )
+                config[new] = config.pop(old)
+        return config
+
+    return validator
+
+
 CONF_JBD_BMS_BLE_ID = "jbd_bms_ble_id"
+CONF_AUTH_TIMEOUT = "auth_timeout"
+CONF_NOTIFY_CHARACTERISTIC_UUID = "notify_characteristic_uuid"
+CONF_CONTROL_CHARACTERISTIC_UUID = "control_characteristic_uuid"
 
 jbd_bms_ble_ns = cg.esphome_ns.namespace("jbd_bms_ble")
 JbdBmsBle = jbd_bms_ble_ns.class_(
@@ -49,6 +71,15 @@ CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(JbdBmsBle),
+            cv.Optional(CONF_SERVICE_UUID, default=0xFF00): cv.int_range(
+                min=0, max=0xFFFF
+            ),
+            cv.Optional(CONF_NOTIFY_CHARACTERISTIC_UUID, default=0xFF01): cv.int_range(
+                min=0, max=0xFFFF
+            ),
+            cv.Optional(CONF_CONTROL_CHARACTERISTIC_UUID, default=0xFF02): cv.int_range(
+                min=0, max=0xFFFF
+            ),
             cv.Optional(CONF_PASSWORD, default=""): cv.All(
                 cv.string_strict, validate_password
             ),
@@ -66,6 +97,12 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await ble_client.register_ble_node(var, config)
+
+    cg.add(var.set_service_uuid(config[CONF_SERVICE_UUID]))
+    cg.add(var.set_notify_characteristic_uuid(config[CONF_NOTIFY_CHARACTERISTIC_UUID]))
+    cg.add(
+        var.set_control_characteristic_uuid(config[CONF_CONTROL_CHARACTERISTIC_UUID])
+    )
 
     if CONF_PASSWORD in config and config[CONF_PASSWORD]:
         cg.add(var.set_password(config[CONF_PASSWORD]))

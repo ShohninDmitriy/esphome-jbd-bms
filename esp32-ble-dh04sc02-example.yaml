@@ -78,6 +78,12 @@ ble_client:
 jbd_bms_ble:
   - id: bms0
     ble_client_id: client0
+
+    # Custom GATT characteristic UUIDs of the JBD-DH04SC02
+    service_uuid: 0xFFF0
+    notify_characteristic_uuid: 0xFFF1
+    control_characteristic_uuid: 0xFFF2
+
     # Some Liontron BMS models require an update interval of less than 8s
     update_interval: 2s
     # Default password of the JBD-SP04S034 V1.3 which requires authentication
@@ -195,62 +201,7 @@ sensor:
       name: "cell voltage 3"
     cell_voltage_4:
       name: "cell voltage 4"
-    cell_voltage_5:
-      name: "cell voltage 5"
-    cell_voltage_6:
-      name: "cell voltage 6"
-    cell_voltage_7:
-      name: "cell voltage 7"
-    cell_voltage_8:
-      name: "cell voltage 8"
-    cell_voltage_9:
-      name: "cell voltage 9"
-    cell_voltage_10:
-      name: "cell voltage 10"
-    cell_voltage_11:
-      name: "cell voltage 11"
-    cell_voltage_12:
-      name: "cell voltage 12"
-    cell_voltage_13:
-      name: "cell voltage 13"
-    cell_voltage_14:
-      name: "cell voltage 14"
-    cell_voltage_15:
-      name: "cell voltage 15"
-    cell_voltage_16:
-      name: "cell voltage 16"
-    cell_voltage_17:
-      name: "cell voltage 17"
-    cell_voltage_18:
-      name: "cell voltage 18"
-    cell_voltage_19:
-      name: "cell voltage 19"
-    cell_voltage_20:
-      name: "cell voltage 20"
-    cell_voltage_21:
-      name: "cell voltage 21"
-    cell_voltage_22:
-      name: "cell voltage 22"
-    cell_voltage_23:
-      name: "cell voltage 23"
-    cell_voltage_24:
-      name: "cell voltage 24"
-    cell_voltage_25:
-      name: "cell voltage 25"
-    cell_voltage_26:
-      name: "cell voltage 26"
-    cell_voltage_27:
-      name: "cell voltage 27"
-    cell_voltage_28:
-      name: "cell voltage 28"
-    cell_voltage_29:
-      name: "cell voltage 29"
-    cell_voltage_30:
-      name: "cell voltage 30"
-    cell_voltage_31:
-      name: "cell voltage 31"
-    cell_voltage_32:
-      name: "cell voltage 32"
+    # ...
     operation_status_bitmask:
       name: "operation status bitmask"
     errors_bitmask:
